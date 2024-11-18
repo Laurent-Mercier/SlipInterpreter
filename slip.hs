@@ -1,40 +1,43 @@
 --                                                        -*- coding: utf-8 -*-
--- Auteurs: Laurent Mercier (20150219) et Andrei Bituleanu (20275298)
--- Date: 18 octobre 2024
+-- Author: Laurent Mercier.
+-- Date: October 18, 2024.
 --
--- Ce programme implante un évaluateur du langage Slip qui est un dérivé du 
--- langage Lisp. On définit les fonctionalités suivantes: un analyseur lexical,
--- un analyseur syntaxique, un pretty printer et une implantation du langage. 
+-- This program implementes an interpreter of the Slip language, which is based 
+-- on the syntax of the Lisp programming language.
+-- langage Lisp. The following functionalities have been implemented by Stefan 
+-- Monnier: the lexical analyzer, the syntactic analyzer, and the pretty 
+-- printer. I have implemented the language implementation (i.e. the s2l and
+-- eval functions). 
 
 -------------------------------------------------------------------------------
--- Pragmas utilisées pour le compilateur GHC. 
+-- Pragmas used for the GHC compiler.
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -------------------------------------------------------------------------------
--- Importations de librairies et définitions de fonctions auxiliaires.
--- Bibliothèque d'analyse syntaxique.
-import Data.Char -- Conversion de Chars de/vers Int et autres.
+-- Library imports and auxiliary function definitions.
+-- Parsing library.
+import Data.Char -- Conversion of Chars to/from Int and others.
 
--- Pour stdout, hPutStr.
+-- For stdout, hPutStr.
 import Data.Text.Encoding (decodeASCII)
 import System.IO
 import Text.ParserCombinators.Parsec
 
 -------------------------------------------------------------------------------
--- La représentation interne des expressions de notre language.          
+-- The internal representation of expressions in our language.          
 data Sexp
-  = Snil -- La liste vide.
-  | Ssym String -- Un symbole.
-  | Snum Int -- Un entier.
-  | Snode Sexp [Sexp] -- Une liste non vide.
-  -- Génère automatiquement un pretty-printer et une fonction de
-  -- comparaison structurelle.
+  = Snil -- The empty list.
+  | Ssym String -- A symbol.
+  | Snum Int -- An integer.
+  | Snode Sexp [Sexp] -- A non-empty list.
+  -- Automatically generates a pretty-printer and a structural comparison 
+  -- function.
   deriving (Show, Eq)
 
--- Exemples:
+-- Examples:
 -- (+ 2 3) ==> Snode (Ssym "+")
 --                   [Snum 2, Snum 3]
 --
@@ -48,12 +51,11 @@ data Sexp
 --        Snum 9]
 
 -------------------------------------------------------------------------------
--- Analyseur lexical.                                                     
+-- Lexical analyzer.                                                     
 pChar :: Char -> Parser ()
 pChar c = do _ <- char c; return ()
 
--- Les commentaires commencent par un point-virgule et se terminent
--- à la fin de la ligne.
+-- Comments start with a semicolon and end at the end of the line.
 pComment :: Parser ()
 pComment = do
   pChar ';'
@@ -61,14 +63,13 @@ pComment = do
   (pChar '\n' <|> eof)
   return ()
 
--- N'importe quelle combinaison d'espaces et de commentaires est considérée
--- comme du blanc.
+-- Any combination of spaces and comments is considered whitespace.
 pSpaces :: Parser ()
 pSpaces = do
   _ <- many (do { _ <- space; return () } <|> pComment)
   return ()
 
--- Un nombre entier est composé de chiffres.
+-- An integer consists of digits.
 integer :: Parser Int
 integer =
   do
@@ -86,8 +87,7 @@ integer =
         integer' (10 * n + (digitToInt c))
         <|> return n
 
--- Les symboles sont constitués de caractères alphanumériques et de signes
--- de ponctuations.
+-- Symbols consist of alphanumeric characters and punctuation marks.
 pSymchar :: Parser Char
 pSymchar = alphaNum <|> satisfy (\c -> c `elem` "!@$%^&*_+-=:|/?<>")
 
@@ -101,8 +101,8 @@ pSymbol = do
     )
 
 -------------------------------------------------------------------------------
--- Analyseur syntaxique.                                                 
--- La notation "'E" est équivalente à "(quote E)".
+-- Syntactic analyzer.                                                 
+-- The notation "'E" is equivalent to "(quote E)".
 pQuote :: Parser Sexp
 pQuote = do
   pChar '\''
@@ -110,7 +110,7 @@ pQuote = do
   e <- pSexp
   return (Snode (Ssym "quote") [e])
 
--- Une liste est de la forme:  ( {e} [. e] ).
+-- A list has the form: ( {e} [. e] ).
 pList :: Parser Sexp
 pList = do
   pChar '('
@@ -130,11 +130,11 @@ pTail =
     --          return e }
     <|> do e <- pSexp; pSpaces; es <- pTail; return (e : es)
 
--- Accepte n'importe quel caractère: utilisé en cas d'erreur.
+-- Accepts any character: used in case of errors.
 pAny :: Parser (Maybe Char)
 pAny = do { c <- anyChar; return (Just c) } <|> return Nothing
 
--- Une Sexp peut-être une liste, un symbol ou un entier.
+-- A Sexp can be a list, a symbol, or an integer.
 pSexpTop :: Parser Sexp
 pSexpTop = do
   pSpaces
@@ -147,14 +147,13 @@ pSexpTop = do
         Nothing -> pzero
         Just c -> error ("Unexpected char '" ++ [c] ++ "'")
 
--- On distingue l'analyse syntaxique d'une Sexp principale de celle d'une
--- sous-Sexp: si l'analyse d'une sous-Sexp échoue à EOF, c'est une erreur de
--- syntaxe alors que si l'analyse de la Sexp principale échoue cela peut être
--- tout à fait normal.
+-- We differentiate parsing a main Sexp from parsing a sub-Sexp: if parsing
+-- a sub-Sexp fails at EOF, it's a syntax error, whereas if parsing the main
+-- Sexp fails, it can be perfectly normal.
 pSexp :: Parser Sexp
 pSexp = pSexpTop <|> error "Unexpected end of stream"
 
--- Une séquence de Sexps.
+-- A sequence of Sexps.
 pSexps :: Parser [Sexp]
 pSexps = do
   pSpaces
@@ -165,8 +164,8 @@ pSexps = do
         return e
     )
 
--- Déclare que notre analyseur syntaxique peut-être utilisé pour la fonction
--- générique "read".
+-- Declares that our syntactic analyzer can be used for the generic "read" 
+-- function.
 instance Read Sexp where
   readsPrec _p s = case parse pSexp "" s of
     Left _ -> []
@@ -184,16 +183,15 @@ showSexp' (Snode h t) =
         showChar ' ' . showSexp' e . showTail es
    in showChar '(' . showSexp' h . showTail t
 
--- On peut utiliser notre pretty-printer pour la fonction générique "show"
--- (utilisée par la boucle interactive de GHCi).  Mais avant de faire cela,
--- il faut enlever le "deriving Show" dans la déclaration de Sexp.
+-- We can use our pretty-printer for the generic "show" function
+-- (used by the GHCi interactive loop). But before doing this,
+-- we need to remove the "deriving Show" in the Sexp declaration.
 {-
 instance Show Sexp where
     showsPrec p = showSexp'
 -}
 
--- Pour lire et imprimer des Sexp plus facilement dans la boucle interactive
--- de Hugs/GHCi:
+-- To read and print Sexps more easily in the Hugs/GHCi interactive loop:
 readSexp :: String -> Sexp
 readSexp = read
 
@@ -201,43 +199,43 @@ showSexp :: Sexp -> String
 showSexp e = showSexp' e ""
 
 -------------------------------------------------------------------------------
--- Représentation intermédiaire Lexp.                         
+-- Intermediate representation Lexp.                         
 type Var = String
 
 data Lexp
-  = Lnum Int                 -- Constante entière.
-  | Lbool Bool               -- Constante Booléenne.
-  | Lvar Var                 -- Référence à une variable.
-  | Ltest Lexp Lexp Lexp     -- Expression conditionnelle (if).
-  | Lfob [Var] Lexp          -- Construction de fobjet (fonction).
-  | Lsend Lexp [Lexp]        -- Appel de fobjet (fonction).
-  | Llet Var Lexp Lexp       -- Déclaration non-récursive (let).
-    -- Déclaration de fonctions mutuellement récursives.
+  = Lnum Int                 -- Integer constant.
+  | Lbool Bool               -- Boolean constant.
+  | Lvar Var                 -- Variable reference.
+  | Ltest Lexp Lexp Lexp     -- Conditional expression (if).
+  | Lfob [Var] Lexp          -- Object function construction.
+  | Lsend Lexp [Lexp]        -- Object function call.
+  | Llet Var Lexp Lexp       -- Non-recursive declaration (let).
+    -- Declaration of mutually recursive functions.
   | Lfix [(Var, Lexp)] Lexp
   deriving (Show, Eq)
 
 s2l :: Sexp -> Lexp
 
--- Cas pour transformer Snum en Lnum.
+-- Case to transform Snum into Lnum.
 s2l (Snum n) = Lnum n
 
--- Cas pour transformer des chaînes "true" en Lbool True et "false" en 
--- Lbool False, sinon un string quelconque en Lvar.
+-- Case to transform the strings "true" into Lbool True and "false" into 
+-- Lbool False, otherwise any other string into Lvar.
 s2l (Ssym s) = case s of
   "true"  -> Lbool True
   "false" -> Lbool False
   _       -> Lvar s
 
--- Cas pour construire une expression conditionnelle.
+-- Case to construct a conditional expression.
 s2l (Snode (Ssym "if") [condition, thenCase, elseCase]) = 
   Ltest (s2l condition) (s2l thenCase) (s2l elseCase)
 
--- Cas pour créer une déclaration non-récursive.
+-- Case to create a non-recursive declaration.
 s2l (Snode (Ssym "let") [Ssym var, val, expression]) = 
   Llet var (s2l val) (s2l expression)
 
--- Cas pour créer un fobjet (fonction). Prend en compte le cas où une fonction
--- est définie dans le corps de la fonction initiale.
+-- Case to create a function object (fob). Handles the case where a function
+-- is defined inside the body of the initial function.
 s2l (Snode (Ssym "fob") [Snode (Ssym arg) args, body]) = 
   case body of
     (Snode (Ssym "fob") [Snode (Ssym arg') args', body']) ->
@@ -245,10 +243,9 @@ s2l (Snode (Ssym "fob") [Snode (Ssym arg) args, body]) =
             map (\(Ssym s) -> s) (Ssym arg' : args')) (s2l body')
     _ -> Lfob (map (\(Ssym s) -> s) (Ssym arg : args)) (s2l body)
 
--- Cas pour les déclarations récursives. On prend la liste des déclarations
--- de variables, de fonctions sucrées et de fonctions non sucrées et on les
--- convertit en paire (nom, déclaration) avec la fonction convertOnList qui 
--- agit récursivement sur la liste.
+-- Case for recursive declarations. We take the list of variable declarations,
+-- sweet functions, and non-sweet functions and convert them into pairs 
+-- (name, declaration) using the recursive function convertOnList.
 s2l (Snode (Ssym "fix") [Snode premier resteAttach, body]) =
   let 
       convertAttach (Snode (Ssym var) [expr]) = 
@@ -260,9 +257,9 @@ s2l (Snode (Ssym "fix") [Snode premier resteAttach, body]) =
       convertAttach (Snode (Ssym funcName) [fob]) = 
         (funcName, s2l fob)
       
-      convertAttach _ = error "Attachement invalide"
+      convertAttach _ = error "Invalid attachment"
       
-      -- Conversion des éléments de la liste.
+      -- Conversion of list elements.
       convertOnList (element1 : reste) =
         if reste == []
           then [convertAttach element1]
@@ -272,46 +269,46 @@ s2l (Snode (Ssym "fix") [Snode premier resteAttach, body]) =
    in 
       Lfix attachList (s2l body)
 
--- Cas pour traiter les appels de fonctions. Les appels peuvent contenir un 
--- fobjet, ou récursivement contenir un autre appel de fonction.
+-- Case to process function calls. Calls may contain a function object, or 
+-- recursively contain another function call.
 s2l (Snode sendNode vals) = case sendNode of
-  (Snode (Ssym "fob") [Snil, Snum n]) -> s2l (Snum n)
+  (Snode (Ssym "fob") [Snil, Snum n]) -> s2l (Snum n) -- Constant function.
   (Snode (Ssym "fob") _) -> 
-    Lsend (s2l sendNode) (map s2l vals)
+    Lsend (s2l sendNode) (map s2l vals) 
     
   (Snode sendNode' vals') -> 
-    s2l (Snode sendNode' (vals' ++ vals))
+    s2l (Snode sendNode' (vals' ++ vals)) -- Recursively defined function.
     
   _ -> 
     Lsend (s2l sendNode) (map s2l vals)
 
 -------------------------------------------------------------------------------
--- Représentation du contexte d'exécution.                                
+-- Representation of the execution context.
 
 data Value
-  = Vnum Int                -- Valeur entière.
-  | Vbool Bool              -- Valeur booléenne.
-  | Vbuiltin ([Value] -> Value) -- Valeur de fonction prédéfinie.
-  | Vfob VEnv [Var] Lexp    -- Valeur d'un fobjet.
+  = Vnum Int                -- Integer value.
+  | Vbool Bool              -- Boolean value.
+  | Vbuiltin ([Value] -> Value) -- Built-in function value.
+  | Vfob VEnv [Var] Lexp    -- Function object value.
   
 instance Show Value where
   showsPrec p (Vnum n) = showsPrec p n
   showsPrec p (Vbool b) = showsPrec p b
   showsPrec _ (Vbuiltin _) = showString "<primitive>"
-  showsPrec _ (Vfob _ _ _) = showString "<fobjet>"
+  showsPrec _ (Vfob _ _ _) = showString "<fobject>"
 
 type VEnv = [(Var, Value)]
 
 env0 :: VEnv
 env0 =
   let 
-      -- Fonction pour créer des opérations binaires.
+      -- Function to create binary operations.
       binop f op =
         Vbuiltin
           ( \vs -> case vs of
               [Vnum n1, Vnum n2] -> f (n1 `op` n2)
-              [_, _] -> error "Pas un nombre"
-              _ -> error "Nombre d'arguments incorrect"
+              [_, _] -> error "Not a number"
+              _ -> error "Incorrect number of arguments"
           )
    in 
       [ ("+", binop Vnum (+)),
@@ -328,19 +325,19 @@ env0 =
       ]
 
 -------------------------------------------------------------------------------
--- Évaluateur                                                            
+-- Evaluator
 
--- Fonction d'évaluation des Lexp.
+-- Function to evaluate Lexp.
 eval :: VEnv -> Lexp -> Value
 
--- Cas pour évaluer une constante entière.
+-- Case to evaluate an integer constant.
 eval _ (Lnum n) = Vnum n
 
--- Cas pour évaluer une constante booléenne.
+-- Case to evaluate a boolean constant.
 eval _ (Lbool True) = Vbool True
 eval _ (Lbool False) = Vbool False
 
--- Cas pour évaluer une expression conditionnelle.
+-- Case to evaluate a conditional expression.
 eval env (Ltest e1 e2 e3) =
   let 
       condEval = eval env e1
@@ -349,19 +346,19 @@ eval env (Ltest e1 e2 e3) =
         Vbool True -> eval env e2
         Vbool False -> eval env e3
 
--- Cas pour évaluer une variable.
+-- Case to evaluate a variable.
 eval env (Lvar x) =
   case lookup x env of
     Just v -> v
-    Nothing -> error ("Variable non-définie: " ++ x)
+    Nothing -> error ("Undefined variable: " ++ x)
 
--- Cas pour évaluer un fobjet.
+-- Case to evaluate a function object.
 eval env (Lfob var expression) = Vfob env var expression
 
--- Cas pour évaluer un appel de fobjet. On doit tenir compte des variables 
--- évaluées dans l'environnement où l'on évalue la fonction. Lsend peut 
--- également appeller une fonction prédéfinie, dans quel cas on applique 
--- la fonction directement.
+-- Case to evaluate a function call. We must account for the variables 
+-- evaluated in the environment where the function is being evaluated. 
+-- Lsend can also call a built-in function, in which case the function is 
+-- applied directly.
 eval env (Lsend func vals) =
   case eval env func of
     Vfob env' args body ->
@@ -373,21 +370,20 @@ eval env (Lsend func vals) =
     
     Vbuiltin f -> f (map (eval env) vals)
     
-    _ -> error "Appel d'une fonction non-définie"
+    _ -> error "Undefined function call"
 
--- Cas pour évaluer une déclaration non-récursive.
+-- Case to evaluate a non-recursive declaration.
 eval env (Llet var val expression) =
   let 
       env' = zip [var] [eval env val] ++ env
    in 
       eval env' expression
 
--- Cas pour évaluer une déclaration récursive. On veut évaluer les déclarations
--- de façon récursive afin que les déclarations récursives au sein de fix 
--- fonctionnent.
+-- Case to evaluate a recursive declaration. We want to evaluate the 
+-- declarations recursively so that recursive declarations within `fix` work.
 eval env (Lfix contenu expr) =
   let
-      -- Création de l'environnement pour les fonctions récursives.
+      -- Creation of the environment for recursive functions.
       envRec = 
         map (\(name, value) -> (name, eval (envRec ++ env) value)) contenu
       newEnv = envRec ++ env
@@ -395,13 +391,13 @@ eval env (Lfix contenu expr) =
       eval newEnv expr
 
 -------------------------------------------------------------------------------
--- Toplevel.                                                              
+-- Toplevel.
 
 evalSexp :: Sexp -> Value
 evalSexp = eval env0 . s2l
 
--- Lit un fichier contenant plusieurs Sexps, les évalues l'une après
--- l'autre, et renvoie la liste des valeurs obtenues.
+-- Reads a file containing multiple Sexps, evaluates them one after another, 
+-- and returns the list of obtained values.
 run :: FilePath -> IO ()
 run filename =
   do
