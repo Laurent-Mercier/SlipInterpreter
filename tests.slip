@@ -1,0 +1,53 @@
+;                                        -*- mode: lisp-data; coding: utf-8 -*-
+; Author: Laurent Mercier.
+; Date: October 18, 2024.
+;
+; Here are some examples of expressions in the Slip language and what they 
+; should return once interpreted.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Basic data types and expressions.
+2                                       ; ↝ 2
++                                       ; ↝ <primitive>
+(+ 2 4)                                 ; ↝ 6
+
+; Functions of one or more variable.
+((fob (x) x) 2)                         ; ↝ 2
+(((fob (x) (fob (y) (* x y)))
+  3)
+ 5)                                     ; ↝ 15
+
+; Recursive let (fix) evaluation.
+(fix (((even x)  (if (= x 0) true  (odd  (- x 1))))
+      ((odd x)   (if (= x 0) false (even (- x 1)))))
+  (odd 42))                             ; ↝ False
+
+; Verifies if the variable defined is positive.
+(let num -7
+  (if (> num 0)
+      true
+      false))                           ; ↝ False
+
+
+; Returns and evaluates a function that adds 2 numbers.
+(((fob (a) (fob (b) (+ a b))) 3) 7)     ; ↝ 10
+
+
+; Recursive definition of a function without syntactic sugar. 
+(fix ((f (fob (x) (+ x 2)))) (f 2))     ;↝ 4
+
+
+; Recursive definition of the factorial function using synctatic sugar. 
+(fix (((factorielle n)
+        (if (= n 0) 1 (* n (factorielle (- n 1))))))
+      (factorielle 5))                  ; ↝ 120
+
+
+; Fibonacci Sequence.
+(fix (((fib n)
+        (if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))
+      (fib 6))                          ; ↝ 8
+
+; Constant function.     
+((fob () 2))                            ; ↝ 2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
