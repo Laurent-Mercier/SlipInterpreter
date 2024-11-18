@@ -1,0 +1,177 @@
+\documentclass{article}
+
+\usepackage[french]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsfonts}            %For \leadsto
+\usepackage{amsmath}             %For \text
+\usepackage{fancybox}            %For \ovalbox
+\usepackage{hyperref}
+\usepackage{color}
+
+\DeclareUnicodeCharacter{03BB}{\ensuremath{{\color{black}{\lambda}}}}
+
+\title{IFT-2035 - Rapport du travail pratique \#1}
+\author{Laurent Mercier (20150219) et Andrei Bituleanu (20275298)}
+\date{18 octobre 2024}
+
+\begin{document}
+
+\maketitle
+
+\newcommand \mML {\ensuremath\mu\textsl{ML}}
+\newcommand \kw [1] {\textsf{#1}}
+\newcommand \id [1] {\textsl{#1}}
+\newcommand \punc [1] {\kw{`#1'}}
+\newcommand \str [1] {\texttt{"#1"}}
+\newenvironment{outitemize}{
+  \begin{itemize}
+  \let \origitem \item \def \item {\origitem[]\hspace{-18pt}}
+}{
+  \end{itemize}
+}
+\newcommand \Align [2][t] {\begin{array}[#1]{@{}l} #2 \end{array}}
+
+\section{Approfondissement des connaissances}
+
+\noindent Durant ce premier travail pratique, nous avons été confrontés à plusieurs concepts de programmation fonctionnelle, notamment liés à la syntaxe du langage Haskell. Bien que nous ayons étudié ces notions en cours, leur mise en pratique a exigé une compréhension plus approfondie des concepts. Les défis que nous avons rencontrés nous ont permis de consolider des concepts tels que la récursivité, le fonctionnement des variables en Haskell ainsi que la gestion d'erreurs dans un environnement purement fonctionnel.
+
+\section{Lecture et compréhension de la donnée}
+
+\noindent Au début du projet, la partie concernant les types \texttt{Lbool} et \texttt{Ltest} s’est avérée relativement simple grâce aux nombreuses indications reçues en cours et durant les démonstrations. La logique nous a permis de bâtir une confiance bien nécessaire pour affronter ce qui s'envenait. Toutefois, notre implémentation initiale s'est avérée douteuse dans certains cas, et nous l'avons modifié plus tard. En effet, nous avions implémenté Ltest de la façon suivante:
+{\footnotesize
+\begin{verbatim}
+    s2l (Snode (Ssym "if") [Snode condition [], Snode thenCase [], 
+    Snode elseCase []]) = 
+        Ltest (s2l condition) (s2l thenCase) (s2l elseCase)
+\end{verbatim}
+}
+\noindent Or, il s'avère que cette définition n'est pas assez générale et mène parfois à des erreurs quand on utilise des fonctions dans les Cases. On a donc finalement opté pour:
+{\footnotesize
+\begin{verbatim}
+    s2l (Snode (Ssym "if") [condition, thenCase, elseCase]) = 
+        Ltest (s2l condition) (s2l thenCase) (s2l elseCase)
+\end{verbatim}
+}
+\noindent De plus, nous avions défini 3 cas différents pour les 2 types de \texttt{Lbool} ainsi que \texttt{Lvar} dans la fonction s2l. Nous avons réalisé ensuite qu'il était possible de le faire de façon plus concise, soit de la façon suivante:
+{\footnotesize
+\begin{verbatim}
+    s2l (Ssym s) = case s of
+        "true"  -> Lbool True
+        "false" -> Lbool False
+        _       -> Lvar s
+\end{verbatim}
+}
+\noindent Au final, une lecture attentive de la donnée du TP1 s'est avérée nécessaire pour bien comprendre la syntaxe de Slip. Ce processus nous a pris plusieurs heures, notamment pour assimiler les subtilités des fonctions pré-écrites. Les questions posées sur Studium ont également été d'une aide relative, nous offrant de vagues pistes sur la méthodologie à prendre.
+
+\section{Analyse des parties importantes du code fourni}
+
+\noindent Avant de commencer à écrire les fonctions \texttt{s2l} et \texttt{eval}, nous avons dû analyser en profondeur les portions de code qui nous étaient fournies. Comprendre la structure du code a été mandataire afin de savoir comment s'y prendre. Les concepts de la matière du cours 2035, ainsi que du cours d'informatique théorique (tel que le sucre syntaxique) nous ont étés utiles. 
+
+\section{Complétion du code fourni}
+
+\noindent L'implémentation des fonctions \texttt{s2l} et \texttt{eval} fut ardue mais enrichissante. Après avoir passé plus de 12 heures consécutives à faire de la programmation par paire, à faire de nombreux tests et essais-erreurs, nous avons finalement complété le code. La fonction \texttt{Lfob} fut l’une des parties les plus longues, car il a fallu utiliser \texttt{ReadSexp} à plusieurs reprises afin de comprendre le comportement d'une fonction en Slip, et sa traduction en Sexp. Nous avions commencé à écrire la fonction \texttt{s2l} pour \texttt{Lfob} de la façon suivante:
+{\footnotesize
+\begin{verbatim}
+    s2l (Snode (Ssym "fob") [Snode (Ssym arg) args, body]) = 
+        Lfob (map (\(Ssym s) -> s) (Ssym arg : args)) (s2l body)
+\end{verbatim}
+}
+\noindent Toutefois, ce bout de code n'était pas approprié pour inclure des fonctions dont le corps est une autre fonction. Nous avons donc modifié le code pour obtenir le résultat final:
+{\footnotesize
+\begin{verbatim}
+    s2l (Snode (Ssym "fob") [Snode (Ssym arg) args, body]) = 
+        case body of
+            (Snode (Ssym "fob") [Snode (Ssym arg') args', body']) ->
+                Lfob (map (\(Ssym s) -> s) (Ssym arg : args) ++ 
+                    map (\(Ssym s) -> s) (Ssym arg' : args')) (s2l body')
+            _ -> Lfob (map (\(Ssym s) -> s) (Ssym arg : args)) (s2l body)
+\end{verbatim}
+}
+\noindent Notre méthode de travail a été d'implémenter la fonction \texttt{s2l} pour chaque type de donnée en premier, et ensuite d'implémenter \texttt{eval} pour ce type de donnée. En effet, après avoir implémenter \texttt{s2l}, implémenter \texttt{eval} pour ce même type de donnée était souvent trivial, ou bien plus facile à faire. En travaillant ainsi, nous avons pu nous concentrer sur comprendre la syntaxe de chaque type de donnée en Sexp en utilisant la fonction \texttt{ReadSexp}, pour ensuite implémenter les fonctions à compléter.\\
+
+\noindent La fonction \texttt{Lsend} fut également un défi de taille. Après de nombreux essais infructueux et une lutte acharnée, nous avons fini par y arriver. En revanche, \texttt{Llet} nous a semblé plus simple et nous a presque donné un excès de confiance, avant d'affronter \texttt{Lfix}, qui fut véritablement le "boss final" de ce TP. Nous avons consacré environ 4 heures d'efforts intenses uniquement sur cette dernière partie. Avec une fatigue montante, nous avons dû redoubler de créativité et de persévérance pour achever l'implémentation du sucre syntaxique. Toutefois, notre implémentation originale ne tenait pas en compte des déclarations de fonctions non sucrées dans les fix:
+{\footnotesize
+\begin{verbatim}
+    s2l (Snode (Ssym "fix") [Snode premier resteAttach, body]) =
+        let 
+            convertAttach (Snode (Ssym var) [expr]) = 
+                (var, s2l expr)
+      
+            convertAttach (Snode (Snode (Ssym funcName) funcArgs) [funcDef]) = 
+                (funcName, Lfob (map (\(Ssym s) -> s) funcArgs) (s2l funcDef))
+      
+            convertAttach _ = error "Attachement invalide"
+      
+            -- Conversion des éléments de la liste.
+            convertOnList (element1 : reste) =
+                if reste == []
+                    then [convertAttach element1]
+                    else convertAttach element1 : convertOnList reste
+      
+            attachList = convertOnList (premier : resteAttach)
+        in 
+            Lfix attachList (s2l body)
+\end{verbatim}
+}
+\noindent Afin de tenir compte des déclarations de fonctions non sucrées, nous avons ajouté la ligne suivante:
+{\footnotesize
+\begin{verbatim}
+            convertAttach (Snode (Ssym funcName) [fob]) = 
+                (funcName, s2l fob)
+\end{verbatim}
+}
+\noindent \texttt{Lfix} fut la partie la plus difficile à implémenter, mais une fois qu'on a compris la structure (un \texttt{Snode} dont la liste de droite est une liste de déclarations de variables ou de fonctions) de celui-ci, généraliser le code aux différents types de déclarations fut plus simple.\\ 
+
+\noindent Un des cas de \texttt{eval} qui fut difficile à implémenter est celui de \texttt{Lsend}. En effet, nous devions tenir compte du fait que les fonctions appelées peuvent être des fob ou des fonctions built-in. De plus, il fallait modifier l'environnement dans lequel la fonction est évalué en tenant compte des déclarations de variable dans l'appel de fonction \texttt{Lsend}. Nous avons fini par écrire le code suivant:
+{\footnotesize
+\begin{verbatim}
+    eval env (Lsend func vals) =
+        case eval env func of
+            Vfob env' args body ->
+                let 
+                    valsEval = map (eval env) vals
+                    env'' = zip args valsEval ++ env'
+                in 
+                    eval env'' body
+    
+            Vbuiltin f -> f (map (eval env) vals)
+    
+            _ -> error "Appel d'une fonction non-définie"
+\end{verbatim}
+}
+\section{Création de tests}
+En terminant, nous avons du réfléchir à 5 tests supplémentaires que l'on pourrait faire passer à notre évaluateur afin de vérifier son bon fonctionnement. Nous nous sommes concentrés sur les fix, les déclarations de fob et un cas pour le let, puisque ce sont les types d'expression qui ont le plus de sous-cas que nous avons du implémenter, nous voulions donc tous les vérifier. Voici les tests que nous avons choisi:
+{\footnotesize
+\begin{verbatim}
+;; Vérifie si la valeur du Llet est positive.
+(let num -7
+  (if (> num 0)
+      true
+      false))                           ; évalue à "False"
+
+
+;; Renvoie une fonction qui effectue a + b avec la valeur de a et b choisi.
+(((fob (a) (fob (b) (+ a b))) 3) 7)     ; évalue à 10
+
+
+;; Fonction récursive sans le sucre syntaxique qui effectue x + 2.
+(fix ((f (fob (x) (+ x 2)))) (f 2))       ; évalue à 4
+
+
+;; Fonction récursive factorielle avec le sucre syntaxique qui retourne la 
+;; factorielle du nombre en paramètre.
+(fix (((factorielle n)
+        (if (= n 0) 1 (* n (factorielle (- n 1))))))
+      (factorielle 5))                      ; évalue à 120
+
+
+;; Fonction récursive représentant la suite de Fibonacci.
+(fix (((fib n)
+        (if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))
+      (fib 6))                            ; évalue à 8
+\end{verbatim}
+}
+\noindent Nous étions bien heureux de voir que nos tests ont passés, et ce, sans problèmes. Finalement, après une dernière exécution réussie de \texttt{exemples.slip}, nous avons ressenti une immense satisfaction. Ce TP fut éprouvant, mais aussi extrêmement gratifiant.
+\end{document}
+

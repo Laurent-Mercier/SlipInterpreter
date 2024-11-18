@@ -1,0 +1,37 @@
+;                                        -*- mode: lisp-data; coding: utf-8 -*-
+; Auteurs: Laurent Mercier (20150219) et Andrei Bituleanu (20275298)
+; Date: 18 octobre 2024
+;
+; Quelques exemples supplémentaires que nous avons écrit.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Vérifie si la valeur du Llet est positive.
+(let num -7
+  (if (> num 0)
+      true
+      false))                           ; ↝ "False"
+
+
+; Renvoie une fonction qui effectue a + b avec la valeur de a et b choisi.
+(((fob (a) (fob (b) (+ a b))) 3) 7)     ; ↝ 10
+
+
+; Fonction récursive sans le sucre syntaxique qui effectue x + 2.
+(fix ((f (fob (x) (+ x 2)))) (f 2))       ;↝ 4
+
+
+; Fonction récursive factorielle avec le sucre syntaxique qui retourne la 
+; factorielle du nombre en paramètre.
+(fix (((factorielle n)
+        (if (= n 0) 1 (* n (factorielle (- n 1))))))
+      (factorielle 5))                      ; ↝ 120
+
+
+; Fonction récursive représentant la suite de Fibonacci.
+(fix (((fib n)
+        (if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))
+      (fib 6))                            ; ↝ 8
+
+; Fonction constante.      
+((fob () 2))                              ; ↝ 2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

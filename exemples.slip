@@ -1,0 +1,22 @@
+;                                        -*- mode: lisp-data; coding: utf-8 -*-
+; Auteurs: Laurent Mercier (20150219) et Andrei Bituleanu (20275298)
+; Date: 18 octobre 2024
+;
+; Quelques exemples qui nous ont été fournis.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+2                                       ; ↝ 2
++                                       ; ↝ <primitive>
+(+ 2 4)                                 ; ↝ 6
+
+((fob (x) x) 2)                         ; ↝ 2
+
+(((fob (x) (fob (y) (* x y)))
+  3)
+ 5)                                     ; ↝ 15
+
+(fix (((even x)  (if (= x 0) true  (odd  (- x 1))))
+      ((odd x)   (if (= x 0) false (even (- x 1)))))
+  (odd 42))                             ; ↝ False
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
